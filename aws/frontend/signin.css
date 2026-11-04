@@ -1,0 +1,68 @@
+.signin-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #f7f8f6;
+}
+.signin-card {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 14px;
+  padding: 36px;
+  background: white;
+  border: 1px solid #e3e8e5;
+  border-radius: 18px;
+  box-shadow: 0 16px 48px #183d3210;
+}
+.signin-card h1 {
+  font-size: 27px;
+  line-height: 1.25;
+}
+.signin-card p,
+.signin-card small {
+  color: #65716c;
+  line-height: 1.6;
+}
+.signin-card label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.signin-card input {
+  border: 1px solid #cbd7d1;
+  border-radius: 8px;
+  padding: 12px;
+  width: 100%;
+  background: white;
+}
+.signin-card .button {
+  justify-content: center;
+  min-height: 42px;
+}
+.signin-card .signin-error {
+  color: #a32f37;
+}
+.account-control {
+  position: fixed;
+  left: 18px;
+  bottom: 70px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 190px;
+  font-size: 12px;
+}
+.account-control span {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .account-control {
+    position: static;
+    max-width: none;
+    padding: 12px 24px;
+    justify-content: flex-end;
+    background: #f7f8f6;
+  }
+}

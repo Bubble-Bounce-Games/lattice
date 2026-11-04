@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+
+node_modules/
+.next/
+dist/
+.vinext/
+
+.wrangler/
+.mf/
+.cache/
+
+graphify-out/
+*.tsbuildinfo
+npm-debug.log*

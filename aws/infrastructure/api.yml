@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Lattice private per-user libraries and account API.
+Parameters:
+  CodeBucket: { Type: String }
+  CodeKey: { Type: String }
+  WebsiteOrigin:
+    Type: String
+    Default: https://lattice.abhijeet-anand.com
+Resources:
+  LibraryTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+      TimeToLiveSpecification: { AttributeName: expiresAt, Enabled: true }
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
+      SSESpecification: { SSEEnabled: true }
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LatticeLibraryAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  [
+                    dynamodb:GetItem,
+                    dynamodb:PutItem,
+                    dynamodb:DeleteItem,
+                    dynamodb:Query,
+                    dynamodb:UpdateItem,
+                  ]
+                Resource: !GetAtt LibraryTable.Arn
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/lattice-api:*
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: /aws/lambda/lattice-api, RetentionInDays: 14 }
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: ApiLogGroup
+    Properties:
+      FunctionName: lattice-api
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Role: !GetAtt ApiRole.Arn
+      Timeout: 28
+      MemorySize: 512
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LibraryTable
+          WEBSITE_ORIGIN: !Ref WebsiteOrigin
+      Code: { S3Bucket: !Ref CodeBucket, S3Key: !Ref CodeKey }
+  Api:
+    Type: AWS::ApiGatewayV2::Api
+    Properties: { Name: lattice-api, ProtocolType: HTTP }
+  Integration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Api
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ApiFunction.Arn
+      PayloadFormatVersion: '2.0'
+  ApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      { ApiId: !Ref Api, RouteKey: '$default', Target: !Sub 'integrations/${Integration}' }
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref Api
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings: { ThrottlingBurstLimit: 20, ThrottlingRateLimit: 10 }
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*
+Outputs:
+  ApiHost:
+    Value: !Sub ${Api}.execute-api.${AWS::Region}.${AWS::URLSuffix}

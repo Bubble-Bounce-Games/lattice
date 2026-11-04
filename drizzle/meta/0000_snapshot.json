@@ -1,0 +1,127 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "23366cf6-02a9-4315-a45f-1172d52580d0",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "knowledge_entries": {
+      "name": "knowledge_entries",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "types": {
+          "name": "types",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_tag": {
+          "name": "source_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_key": {
+          "name": "source_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "search_text": {
+          "name": "search_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "link": {
+          "name": "link",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_entries_created_at": {
+          "name": "idx_entries_created_at",
+          "columns": ["created_at"],
+          "isUnique": false
+        },
+        "idx_entries_source_created_at": {
+          "name": "idx_entries_source_created_at",
+          "columns": ["source_key", "created_at"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "entry_title_nonempty": {
+          "name": "entry_title_nonempty",
+          "value": "length(trim(\"knowledge_entries\".\"title\")) > 0"
+        },
+        "entry_source_nonempty": {
+          "name": "entry_source_nonempty",
+          "value": "length(trim(\"knowledge_entries\".\"source_tag\")) > 0"
+        },
+        "entry_summary_nonempty": {
+          "name": "entry_summary_nonempty",
+          "value": "length(trim(\"knowledge_entries\".\"summary\")) > 0"
+        },
+        "entry_types_array": {
+          "name": "entry_types_array",
+          "value": "json_valid(\"knowledge_entries\".\"types\") AND json_array_length(\"knowledge_entries\".\"types\") BETWEEN 1 AND 5"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

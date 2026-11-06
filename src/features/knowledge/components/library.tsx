@@ -99,8 +99,10 @@ export function Library({
   const newButton = useRef<HTMLButtonElement>(null);
   const activeBeforePanel = useRef<HTMLElement | null>(null);
   const deletingRef = useRef(false);
-  const showEntries = view === 'all' || view === 'home' || !!query;
   const filtered = !!(query || type || source || date !== 'all');
+  const showEntries = view === 'all' || view === 'home' || filtered;
+  // Settings keeps its compact header until a search turns it into a results page.
+  const pageInHeader = view !== 'settings' || filtered;
   const notify = useCallback((message: string) => setToast(message), []);
   useEffect(() => {
     if (!toast) return;
@@ -272,6 +274,24 @@ export function Library({
     sources: ['Sources', 'The people, publications, and places that shape your thinking.'],
     settings: ['Settings', 'Make a little space for the way you like to learn.'],
   };
+  const pageTitle = (
+    <>
+      <h1>
+        {query ? 'Search results' : headings[view][0]}
+        <span className="heading-dot">.</span>
+      </h1>
+      <p>{query ? `Finding “${query}” in your knowledge library.` : headings[view][1]}</p>
+    </>
+  );
+  const countLabel = showEntries
+    ? loading
+      ? 'Gathering your ideas…'
+      : data
+        ? `${data.total} ${data.total === 1 ? 'item' : 'items'}${filtered ? ' found' : ''}`
+        : 'Your library'
+    : sourcesError
+      ? ''
+      : `${sources.length} ${sources.length === 1 ? 'source' : 'sources'}`;
   return (
     <div className={`app-shell ${panel ? 'has-panel' : ''} ${navCollapsed ? 'nav-collapsed' : ''}`}>
       <a className="skip-link" href="#main-content">
@@ -321,67 +341,63 @@ export function Library({
         </div>
       </aside>
       <div className="workspace">
-        <header className="topbar">
-          <button
-            className="nav-toggle icon-button"
-            aria-label={navOpen ? 'Hide navigation' : 'Show navigation'}
-            aria-controls="sidebar"
-            aria-expanded={navOpen}
-            onClick={() => (drawerNav ? setMobileNav(!mobileNav) : setNavCollapsed(!navCollapsed))}
-          >
-            <Menu size={21} />
-          </button>
-          <div className="top-actions">
-            <div className="search-input">
-              <Search size={17} />
-              <input
-                ref={searchInput}
-                aria-label="Search entries"
-                placeholder="Search articles, podcasts, books..."
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setPage(1);
-                }}
-                maxLength={300}
-              />
-              {query ? (
-                <button
-                  className="icon-button"
-                  aria-label="Clear search"
-                  onClick={() => {
-                    setQuery('');
-                    setPage(1);
-                    searchInput.current?.focus();
-                  }}
-                >
-                  <X size={14} />
-                </button>
-              ) : (
-                <kbd>⌘ K</kbd>
-              )}
-            </div>
+        <header className={`topbar ${pageInHeader ? 'topbar-expanded' : ''}`}>
+          <div className="topbar-main">
             <button
-              ref={newButton}
-              className="button primary new-entry"
-              onClick={() => openPanel({ mode: 'new' })}
-              disabled={!!panel}
+              className="nav-toggle icon-button"
+              aria-label={navOpen ? 'Hide navigation' : 'Show navigation'}
+              aria-controls="sidebar"
+              aria-expanded={navOpen}
+              onClick={() =>
+                drawerNav ? setMobileNav(!mobileNav) : setNavCollapsed(!navCollapsed)
+              }
             >
-              <Plus size={18} />
-              <span>New Entry</span>
+              <Menu size={21} />
             </button>
+            <div className="top-actions">
+              <div className="search-input">
+                <Search size={17} />
+                <input
+                  ref={searchInput}
+                  aria-label="Search entries"
+                  placeholder="Search articles, podcasts, books..."
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setPage(1);
+                  }}
+                  maxLength={300}
+                />
+                {query ? (
+                  <button
+                    className="icon-button"
+                    aria-label="Clear search"
+                    onClick={() => {
+                      setQuery('');
+                      setPage(1);
+                      searchInput.current?.focus();
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                ) : (
+                  <kbd>⌘ K</kbd>
+                )}
+              </div>
+              <button
+                ref={newButton}
+                className="button primary new-entry"
+                onClick={() => openPanel({ mode: 'new' })}
+                disabled={!!panel}
+              >
+                <Plus size={18} />
+                <span>New Entry</span>
+              </button>
+            </div>
           </div>
-        </header>
-        <main id="main-content" className="library">
-          <div className="page-heading">
-            <h1>
-              {query ? 'Search results' : headings[view][0]}
-              <span className="heading-dot">.</span>
-            </h1>
-            <p>{query ? `Finding “${query}” in your knowledge library.` : headings[view][1]}</p>
-          </div>
-          {showEntries && (
+          {pageInHeader && (
             <>
+              <div className="topbar-heading">{pageTitle}</div>
               <div className="filters">
                 <div className={`select-control ${type ? 'selected' : ''}`}>
                   <select
@@ -442,159 +458,161 @@ export function Library({
                     Clear filters
                   </button>
                 )}
-                <div className="filter-spacer" />
-                <div className="select-control sort-control">
-                  <ArrowDownUp size={13} />
-                  <select
-                    aria-label="Sort entries"
-                    value={sort}
-                    onChange={(e) => {
-                      setSort(e.target.value as KnowledgeSortOption);
-                      setPage(1);
-                    }}
-                  >
-                    <option value="newest">Newest first</option>
-                    <option value="oldest">Oldest first</option>
-                    <option value="title-asc">Title A–Z</option>
-                    <option value="title-desc">Title Z–A</option>
-                  </select>
-                  <ChevronDown size={12} />
-                </div>
-                <div className="view-switch" role="group" aria-label="View mode">
-                  <button
-                    className={!grid ? 'active' : ''}
-                    aria-label="List view"
-                    aria-pressed={!grid}
-                    onClick={() => setView(false)}
-                  >
-                    <List size={17} />
-                  </button>
-                  <button
-                    className={grid ? 'active' : ''}
-                    aria-label="Grid view"
-                    aria-pressed={grid}
-                    onClick={() => setView(true)}
-                  >
-                    <LayoutGrid size={15} />
-                  </button>
-                </div>
-              </div>
-              <div className="list-caption">
-                <span aria-live="polite">
-                  {loading
-                    ? 'Gathering your ideas…'
-                    : data
-                      ? `${data.total} ${data.total === 1 ? 'item' : 'items'}${filtered ? ' found' : ''}`
-                      : 'Your library'}
-                </span>
-                <span className="list-caption-note">A growing collection of perspective</span>
-              </div>
-              {error ? (
-                <section className="error-state" role="alert">
-                  <h2>Your library couldn’t load</h2>
-                  <p>{error}</p>
-                  <button className="button" onClick={() => setRevision((v) => v + 1)}>
-                    <RotateCcw size={14} />
-                    Try again
-                  </button>
-                </section>
-              ) : loading ? (
-                <div className="skeleton-list" aria-label="Loading entries" aria-busy="true">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div className="skeleton-row" key={i}>
-                      <span />
-                      <div>
-                        <span />
-                        <span />
-                        <span />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : data?.entries.length ? (
-                <>
-                  <div className={`entries ${grid ? 'grid-view' : ''}`}>
-                    {data.entries.map((entry) => (
-                      <EntryCard
-                        key={entry.id}
-                        entry={entry}
-                        onView={() => openPanel({ mode: 'view', entry })}
-                        onEdit={() => openPanel({ mode: 'edit', entry })}
-                        onDelete={() => confirmDelete(entry)}
-                        onCopy={() => void copy(entry)}
-                      />
-                    ))}
-                  </div>
-                  {data.total > data.limit && (
-                    <div className="pagination">
-                      <button
-                        className="button"
-                        disabled={page <= 1}
-                        onClick={() => setPage((p) => p - 1)}
-                      >
-                        Previous
-                      </button>
-                      <span>
-                        Page {page} of {Math.ceil(data.total / data.limit)}
-                      </span>
-                      <button
-                        className="button"
-                        disabled={page * data.limit >= data.total}
-                        onClick={() => setPage((p) => p + 1)}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-                  <div className="library-foot">
-                    <span className="foot-line" />
-                    <span>A place for ideas to take root.</span>
-                    <span className="foot-line" />
-                  </div>
-                </>
-              ) : (
-                <section className="empty-state">
-                  <span className="empty-icon">
-                    {filtered ? (
-                      <Search size={26} strokeWidth={1.4} />
-                    ) : (
-                      <BookOpen size={28} strokeWidth={1.3} />
-                    )}
+                <div className="filter-summary">
+                  <span className="filter-count" aria-live="polite">
+                    {countLabel}
                   </span>
-                  <div className="eyebrow">
-                    {filtered ? 'A FRESH PERSPECTIVE' : 'MAKE ROOM FOR YOUR NEXT IDEA'}
-                  </div>
-                  <h2>{filtered ? 'No matching entries' : 'Your knowledge library is empty'}</h2>
-                  <p>
-                    {filtered ? (
-                      'Try a different search or give your filters a little more room.'
-                    ) : (
-                      <>
-                        Save articles, podcasts, books and ideas you want to remember.
-                        <br />A few words today. A little more clarity tomorrow.
-                      </>
-                    )}
-                  </p>
-                  <button
-                    className={`button ${filtered ? '' : 'primary'}`}
-                    onClick={filtered ? clearFilters : () => openPanel({ mode: 'new' })}
-                  >
-                    {filtered ? (
-                      <>
-                        <RotateCcw size={14} />
-                        Clear filters
-                      </>
-                    ) : (
-                      <>
-                        <Plus size={16} />
-                        Create your first entry
-                      </>
-                    )}
-                  </button>
-                </section>
-              )}
+                  {showEntries && (
+                    <>
+                      <div className="select-control sort-control">
+                        <ArrowDownUp size={13} />
+                        <select
+                          aria-label="Sort entries"
+                          value={sort}
+                          onChange={(e) => {
+                            setSort(e.target.value as KnowledgeSortOption);
+                            setPage(1);
+                          }}
+                        >
+                          <option value="newest">Newest first</option>
+                          <option value="oldest">Oldest first</option>
+                          <option value="title-asc">Title A–Z</option>
+                          <option value="title-desc">Title Z–A</option>
+                        </select>
+                        <ChevronDown size={12} />
+                      </div>
+                      <div className="view-switch" role="group" aria-label="View mode">
+                        <button
+                          className={!grid ? 'active' : ''}
+                          aria-label="List view"
+                          aria-pressed={!grid}
+                          onClick={() => setView(false)}
+                        >
+                          <List size={17} />
+                        </button>
+                        <button
+                          className={grid ? 'active' : ''}
+                          aria-label="Grid view"
+                          aria-pressed={grid}
+                          onClick={() => setView(true)}
+                        >
+                          <LayoutGrid size={15} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </>
           )}
+        </header>
+        <main id="main-content" className={`library ${pageInHeader ? 'items-only' : ''}`}>
+          {!pageInHeader && <div className="page-heading">{pageTitle}</div>}
+          {showEntries &&
+            (error ? (
+              <section className="error-state" role="alert">
+                <h2>Your library couldn’t load</h2>
+                <p>{error}</p>
+                <button className="button" onClick={() => setRevision((v) => v + 1)}>
+                  <RotateCcw size={14} />
+                  Try again
+                </button>
+              </section>
+            ) : loading ? (
+              <div className="skeleton-list" aria-label="Loading entries" aria-busy="true">
+                {[0, 1, 2, 3].map((i) => (
+                  <div className="skeleton-row" key={i}>
+                    <span />
+                    <div>
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : data?.entries.length ? (
+              <>
+                <div className={`entries ${grid ? 'grid-view' : ''}`}>
+                  {data.entries.map((entry) => (
+                    <EntryCard
+                      key={entry.id}
+                      entry={entry}
+                      onView={() => openPanel({ mode: 'view', entry })}
+                      onEdit={() => openPanel({ mode: 'edit', entry })}
+                      onDelete={() => confirmDelete(entry)}
+                      onCopy={() => void copy(entry)}
+                    />
+                  ))}
+                </div>
+                {data.total > data.limit && (
+                  <div className="pagination">
+                    <button
+                      className="button"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => p - 1)}
+                    >
+                      Previous
+                    </button>
+                    <span>
+                      Page {page} of {Math.ceil(data.total / data.limit)}
+                    </span>
+                    <button
+                      className="button"
+                      disabled={page * data.limit >= data.total}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+                <div className="library-foot">
+                  <span className="foot-line" />
+                  <span>A place for ideas to take root.</span>
+                  <span className="foot-line" />
+                </div>
+              </>
+            ) : (
+              <section className="empty-state">
+                <span className="empty-icon">
+                  {filtered ? (
+                    <Search size={26} strokeWidth={1.4} />
+                  ) : (
+                    <BookOpen size={28} strokeWidth={1.3} />
+                  )}
+                </span>
+                <div className="eyebrow">
+                  {filtered ? 'A FRESH PERSPECTIVE' : 'MAKE ROOM FOR YOUR NEXT IDEA'}
+                </div>
+                <h2>{filtered ? 'No matching entries' : 'Your knowledge library is empty'}</h2>
+                <p>
+                  {filtered ? (
+                    'Try a different search or give your filters a little more room.'
+                  ) : (
+                    <>
+                      Save articles, podcasts, books and ideas you want to remember.
+                      <br />A few words today. A little more clarity tomorrow.
+                    </>
+                  )}
+                </p>
+                <button
+                  className={`button ${filtered ? '' : 'primary'}`}
+                  onClick={filtered ? clearFilters : () => openPanel({ mode: 'new' })}
+                >
+                  {filtered ? (
+                    <>
+                      <RotateCcw size={14} />
+                      Clear filters
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} />
+                      Create your first entry
+                    </>
+                  )}
+                </button>
+              </section>
+            ))}
           {!showEntries && view === 'sources' && (
             <div className="sources-view">
               {sourcesError ? (
@@ -604,49 +622,37 @@ export function Library({
                     Try again
                   </button>
                 </section>
+              ) : sources.length ? (
+                <div className="source-grid">
+                  {sources.map((s) => (
+                    <Link
+                      className="source-card"
+                      key={s.sourceKey}
+                      href={`/?source=${encodeURIComponent(s.sourceKey)}`}
+                    >
+                      <div className="source-initial">{s.sourceTag.slice(0, 2).toUpperCase()}</div>
+                      <div>
+                        <h2>{s.sourceTag}</h2>
+                        <p>
+                          {s.count} {s.count === 1 ? 'entry' : 'entries'}
+                        </p>
+                      </div>
+                      <ArrowUpRight size={18} />
+                    </Link>
+                  ))}
+                </div>
               ) : (
-                <>
-                  <div className="list-caption">
-                    <span>
-                      {sources.length} {sources.length === 1 ? 'source' : 'sources'}
-                    </span>
-                    <span>Collected along the way</span>
-                  </div>
-                  {sources.length ? (
-                    <div className="source-grid">
-                      {sources.map((s) => (
-                        <Link
-                          className="source-card"
-                          key={s.sourceKey}
-                          href={`/?source=${encodeURIComponent(s.sourceKey)}`}
-                        >
-                          <div className="source-initial">
-                            {s.sourceTag.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <h2>{s.sourceTag}</h2>
-                            <p>
-                              {s.count} {s.count === 1 ? 'entry' : 'entries'}
-                            </p>
-                          </div>
-                          <ArrowUpRight size={18} />
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <section className="empty-state">
-                      <span className="empty-icon">
-                        <Database size={28} strokeWidth={1.3} />
-                      </span>
-                      <h2>Good ideas come from everywhere</h2>
-                      <p>Your sources will appear here as you save entries.</p>
-                      <button className="button primary" onClick={() => openPanel({ mode: 'new' })}>
-                        <Plus size={16} />
-                        New Entry
-                      </button>
-                    </section>
-                  )}
-                </>
+                <section className="empty-state">
+                  <span className="empty-icon">
+                    <Database size={28} strokeWidth={1.3} />
+                  </span>
+                  <h2>Good ideas come from everywhere</h2>
+                  <p>Your sources will appear here as you save entries.</p>
+                  <button className="button primary" onClick={() => openPanel({ mode: 'new' })}>
+                    <Plus size={16} />
+                    New Entry
+                  </button>
+                </section>
               )}
             </div>
           )}

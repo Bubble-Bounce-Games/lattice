@@ -172,6 +172,54 @@ nav a:hover {
   gap: 20px;
   padding: 0 42px;
 }
+.topbar-main {
+  display: contents;
+}
+/* Home, All Items and Sources keep their title and filters here, leaving only items below. */
+.topbar.topbar-expanded {
+  height: auto;
+  min-height: 132px;
+  display: grid;
+  /* The subtitle gets first claim on the row; the search box gives up width before it wraps. */
+  grid-template-columns: auto minmax(0, max-content) minmax(min-content, 1fr);
+  grid-template-areas:
+    'toggle heading actions'
+    'filters filters filters';
+  align-content: center;
+  gap: 12px 20px;
+  /* Lines the header content up with the centred item list on very wide screens. */
+  padding: 14px max(42px, calc((100% - 1356px) / 2));
+}
+.topbar-expanded .nav-toggle {
+  grid-area: toggle;
+}
+.topbar-expanded .top-actions {
+  grid-area: actions;
+  justify-content: flex-end;
+}
+.topbar-heading {
+  grid-area: heading;
+  min-width: 0;
+}
+.topbar-heading h1 {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  line-height: 1.2;
+  margin: 0 0 3px;
+}
+/* A long search echoed into the subtitle must not grow the header without limit. */
+.topbar-heading p {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  margin: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .top-actions {
   display: flex;
   align-items: center;
@@ -242,10 +290,22 @@ nav a:hover {
   margin: 0;
 }
 .filters {
+  grid-area: filters;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  margin: 30px 0 20px;
+}
+.filter-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.filter-count {
+  font-size: 11px;
+  color: #5f6f67;
+  white-space: nowrap;
 }
 .filter-spacer {
   flex: 1;
@@ -333,6 +393,13 @@ svg {
   color: #5f6a68;
   height: 40px;
   width: 350px;
+}
+@media (min-width: 1051px) {
+  .topbar-expanded .search-input {
+    flex: 0 1 350px;
+    width: auto;
+    min-width: 240px;
+  }
 }
 .search-input input {
   background: none;
@@ -459,22 +526,6 @@ svg {
   background: transparent;
   color: #2b7261;
   padding: 7px 0;
-}
-.list-caption {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
-  align-items: center;
-  font-size: 10px;
-  color: #616967;
-  margin: 22px 0 14px;
-  letter-spacing: 0.1px;
-}
-.list-caption > span:first-child {
-  color: #5f6f67;
-}
-.list-caption-note {
-  font-size: 10px;
 }
 .entries {
   display: flex;
@@ -708,7 +759,6 @@ svg {
 .pagination .button:disabled {
   cursor: default;
 }
-.sources-view,
 .settings-view {
   margin-top: 36px;
 }
@@ -925,11 +975,11 @@ dialog::backdrop {
 }
 .drawer {
   position: fixed;
-  inset: 106px 20px 20px auto;
+  inset: 150px 20px 20px auto;
   margin: 0;
   width: 420px;
   max-width: calc(100vw - 40px);
-  height: calc(100dvh - 126px);
+  height: calc(100dvh - 170px);
   max-height: none;
   overflow: hidden;
   flex-direction: column;
@@ -1408,12 +1458,6 @@ dialog::backdrop {
   margin-right: 440px;
   padding-right: 30px;
 }
-.has-panel .list-caption-note {
-  display: none;
-}
-.has-panel .filters {
-  flex-wrap: wrap;
-}
 .has-panel .grid-view {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1439,15 +1483,6 @@ dialog::backdrop {
 }
 .has-panel .page-heading p {
   font-size: 11px;
-}
-.has-panel .filters {
-  gap: 7px;
-}
-.has-panel .select-control select {
-  max-width: 135px;
-}
-.has-panel .clear-filters {
-  order: 5;
 }
 .has-panel .source-grid {
   grid-template-columns: 1fr;
@@ -1483,6 +1518,9 @@ dialog::backdrop {
   .topbar {
     padding: 0 30px;
   }
+  .topbar.topbar-expanded {
+    padding: 14px 30px;
+  }
   .library {
     padding-left: 30px;
     padding-right: 30px;
@@ -1500,12 +1538,6 @@ dialog::backdrop {
   }
   .has-panel .entry-date {
     display: none;
-  }
-  .has-panel .filters .filter-spacer {
-    display: none;
-  }
-  .has-panel .sort-control {
-    margin-left: auto;
   }
   .grid-view,
   .source-grid {
@@ -1552,17 +1584,18 @@ dialog::backdrop {
   .search-input {
     width: 320px;
   }
+  .topbar.topbar-expanded {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'toggle actions'
+      'heading heading'
+      'filters filters';
+  }
   .grid-view {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .has-panel .grid-view {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .filters {
-    flex-wrap: wrap;
-  }
-  .list-caption-note {
-    display: none;
   }
   .entry-date {
     font-size: 9px;
@@ -1604,6 +1637,26 @@ dialog::backdrop {
     height: 76px;
     gap: 15px;
   }
+  /* Only the action row stays pinned; the title and filters scroll away so items keep the screen. */
+  .topbar.topbar-expanded {
+    display: contents;
+  }
+  .topbar-expanded .topbar-main {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    position: sticky;
+    top: 0;
+    z-index: 31;
+    height: 76px;
+    padding: 0 20px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-heading {
+    padding: 16px 20px 0;
+    background: #fff;
+  }
   .top-actions {
     flex: 1;
     gap: 12px;
@@ -1636,22 +1689,12 @@ dialog::backdrop {
   }
   .filters {
     gap: 8px;
-    margin-top: 25px;
+    padding: 12px 20px 14px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
   }
   .select-control select {
     max-width: 140px;
-  }
-  .filters .filter-spacer {
-    display: none;
-  }
-  .sort-control {
-    margin-left: auto;
-  }
-  .clear-filters {
-    order: 5;
-  }
-  .list-caption {
-    margin-top: 20px;
   }
   .entry-open {
     padding: 19px 0 19px 17px;
@@ -1728,6 +1771,17 @@ dialog::backdrop {
     gap: 8px;
     height: 69px;
   }
+  .topbar-expanded .topbar-main {
+    height: 69px;
+    padding: 0 14px;
+    gap: 8px;
+  }
+  .topbar-heading {
+    padding: 14px 14px 0;
+  }
+  .topbar-heading h1 {
+    font-size: 22px;
+  }
   .sidebar,
   .nav-backdrop {
     top: 69px;
@@ -1774,6 +1828,7 @@ dialog::backdrop {
   }
   .filters {
     gap: 6px;
+    padding: 10px 14px 12px;
   }
   .select-control {
     font-size: 10px;
@@ -1787,35 +1842,15 @@ dialog::backdrop {
     right: 8px;
     width: 11px;
   }
-  .sort-control {
-    margin-top: 5px;
-    margin-left: 0;
-  }
   .sort-control > svg:first-child {
     margin-left: 0;
   }
   .sort-control select {
     padding-left: 0;
   }
-  .view-switch {
-    margin-left: auto;
-    margin-top: 5px;
-  }
-  .filters > .filter-spacer {
-    display: block;
-    flex-basis: 100%;
-    height: 0;
-  }
-  .has-panel .filters > .filter-spacer {
-    display: block;
-  }
   .view-switch button {
     height: 25px;
     width: 28px;
-  }
-  .list-caption {
-    font-size: 10px;
-    margin-top: 18px;
   }
   .entries {
     gap: 10px;
@@ -1963,6 +1998,12 @@ dialog::backdrop {
   .confirm-content {
     padding: 24px;
   }
+}
+.library.items-only {
+  padding-top: 24px;
+}
+.items-only .empty-state {
+  margin-top: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   *,

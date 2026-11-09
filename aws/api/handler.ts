@@ -11,6 +11,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { z } from 'zod';
 import { DynamoKnowledgeRepository } from './repository';
+import { importSchema } from './import';
 import {
   entryDeleteSchema,
   entryInputSchema,
@@ -31,7 +32,7 @@ type Event = {
 const passwordKey = promisify(scrypt);
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const cookieName = '__Host-lattice-session';
-const credentials = z
+const legacyCredentials = z
   .object({
     username: z
       .string()
@@ -41,6 +42,20 @@ const credentials = z
     password: z.string().min(1).max(128),
   })
   .strict();
+const emailCredentials = z
+  .object({
+    email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
+    password: z.string().min(1).max(128),
+  })
+  .strict();
+const credentials = z.union([
+  emailCredentials.transform(({ email, password }) => ({
+    username: email,
+    password,
+    isEmail: true,
+  })),
+  legacyCredentials.transform((value) => ({ ...value, isEmail: false })),
+]);
 class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -87,12 +102,16 @@ export function createHandler(db: DynamoDBDocumentClient, table: string, origin:
       );
       if ((attempts.Attributes?.attempts ?? 0) > 20)
         throw new HttpError(429, 'Too many attempts. Please wait a minute.');
-      const { username, password } = credentials.parse(body);
+      const parsed = credentials.safeParse(body);
+      if (!parsed.success) throw new HttpError(400, 'Enter a valid email address and password.');
+      const { username, password, isEmail } = parsed.data;
       const userKey = `USER#${username}`;
       let user = await get(userKey, 'PROFILE');
-      if (path === '/api/signup') {
-        if (password.length < 12)
-          throw new HttpError(400, 'Use a password with at least 12 characters.');
+      const explicitSignup = path === '/api/signup';
+      if (explicitSignup || (!user && isEmail)) {
+        const minimum = isEmail ? 8 : 12;
+        if (password.length < minimum)
+          throw new HttpError(400, `Use a password with at least ${minimum} characters.`);
         const salt = Buffer.from(randomBytes(16)).toString('hex');
         const hash = Buffer.from((await passwordKey(password, salt, 64)) as Uint8Array).toString(
           'hex',
@@ -114,16 +133,20 @@ export function createHandler(db: DynamoDBDocumentClient, table: string, origin:
             }),
           );
         } catch (error) {
-          if (error instanceof Error && error.name === 'ConditionalCheckFailedException')
-            throw new HttpError(409, 'That username is taken.');
-          throw error;
+          if (!(error instanceof Error && error.name === 'ConditionalCheckFailedException'))
+            throw error;
+          if (explicitSignup) throw new HttpError(409, 'That username is taken.');
+          // Two first-time requests can race. Use the stored profile and check
+          // its password rather than replacing another request's credentials.
+          user = await get(userKey, 'PROFILE');
         }
-      } else {
+      }
+      if (!explicitSignup) {
         // Hash even for unknown usernames to avoid an inexpensive username probe.
         const hash = (await passwordKey(password, user?.salt ?? 'unknown-user-salt', 64)) as Buffer;
         const expected = Buffer.from(user?.passwordHash ?? '00'.repeat(64), 'hex');
         if (!user || hash.length !== expected.length || !timingSafeEqual(hash, expected))
-          throw new HttpError(401, 'Username or password is wrong.');
+          throw new HttpError(401, 'Email or password is wrong.');
       }
       const token = Buffer.from(randomBytes(32)).toString('base64url');
       const lifetime = 30 * 86400;
@@ -175,6 +198,15 @@ export function createHandler(db: DynamoDBDocumentClient, table: string, origin:
       throw new HttpError(401, 'Your session expired. Sign in again.');
     if (method === 'GET' && path === '/api/session') return json({ username: session.username });
     const repository = new DynamoKnowledgeRepository(db, table, session.userId);
+    if (method === 'POST' && path === '/api/import') {
+      const { entries } = importSchema.parse(body);
+      const results = [];
+      for (const entry of entries) results.push(await repository.importEntry(entry));
+      return json({
+        imported: results.filter((result) => result === 'imported').length,
+        skipped: results.filter((result) => result === 'skipped').length,
+      });
+    }
     if (path === '/api/entries') {
       if (method === 'GET')
         return json(

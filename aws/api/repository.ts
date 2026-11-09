@@ -49,6 +49,22 @@ export class DynamoKnowledgeRepository implements KnowledgeRepository {
     );
     return entry;
   }
+  async importEntry(entry: KnowledgeEntry): Promise<'imported' | 'skipped'> {
+    try {
+      await this.db.send(
+        new PutCommand({
+          TableName: this.table,
+          Item: { ...this.key(entry.id), entry, version: entry.updatedAt },
+          ConditionExpression: 'attribute_not_exists(pk)',
+        }),
+      );
+      return 'imported';
+    } catch (error) {
+      if (error instanceof Error && error.name === 'ConditionalCheckFailedException')
+        return 'skipped';
+      throw error;
+    }
+  }
   async updateEntry(
     id: string,
     input: KnowledgeEntryInput,

@@ -105,6 +105,120 @@ beforeEach(() => {
   handler = createHandler(db as unknown as DynamoDBDocumentClient, 'test', origin);
 });
 describe('AWS private libraries', () => {
+  it('automatically saves email access on first sign-in and reuses the private library', async () => {
+    const credentials = { email: ' Reader@Example.com ', password: 'reader-pass-123' };
+    const first = await request('/api/signin', 'POST', credentials);
+    expect(first.statusCode).toBe(200);
+    expect(JSON.parse(first.body).username).toBe('reader@example.com');
+    const cookie = first.cookies![0].split(';')[0];
+    const entry = JSON.parse((await request('/api/entries', 'POST', input, cookie)).body);
+    const second = await request('/api/signin', 'POST', {
+      ...credentials,
+      email: 'reader@example.com',
+    });
+    expect(second.statusCode).toBe(200);
+    const secondCookie = second.cookies![0].split(';')[0];
+    expect(
+      JSON.parse((await request('/api/entries', 'GET', undefined, secondCookie)).body).entries,
+    ).toEqual([entry]);
+    const profile = db.items.get('USER#reader@example.com|PROFILE')!;
+    expect(profile.passwordHash).toBeTruthy();
+    expect(JSON.stringify(profile)).not.toContain(credentials.password);
+    const userId = profile.userId;
+    const wrong = await request('/api/signin', 'POST', {
+      ...credentials,
+      password: 'different-password',
+    });
+    expect(wrong.statusCode).toBe(401);
+    expect(wrong.cookies).toBeUndefined();
+    expect(db.items.get('USER#reader@example.com|PROFILE')!.userId).toBe(userId);
+  });
+  it('validates emails and first-use passwords without creating invalid accounts', async () => {
+    expect(
+      (await request('/api/signin', 'POST', { email: 'not-email', password: 'reader-pass-123' }))
+        .statusCode,
+    ).toBe(400);
+    expect(
+      (await request('/api/signin', 'POST', { email: 'reader@example.com', password: 'short' }))
+        .statusCode,
+    ).toBe(400);
+    expect([...db.items.keys()].filter((key) => key.startsWith('USER#'))).toEqual([]);
+  });
+  it('handles simultaneous first sign-ins without changing the stored password', async () => {
+    const attempts = await Promise.all([
+      request('/api/signin', 'POST', {
+        email: 'reader@example.com',
+        password: 'first-password-123',
+      }),
+      request('/api/signin', 'POST', {
+        email: 'reader@example.com',
+        password: 'other-password-456',
+      }),
+    ]);
+    expect(attempts.map((attempt) => attempt.statusCode).sort()).toEqual([200, 401]);
+    expect([...db.items.keys()].filter((key) => key.startsWith('USER#'))).toHaveLength(1);
+  });
+  it('imports into only the authenticated library, retaining dates and skipping existing IDs', async () => {
+    const alice = await signup('alice'),
+      bob = await signup('bob');
+    const entry = {
+      ...input,
+      id: 'a4a2fbdc-25ed-4a46-8f78-a0cb401c69ff',
+      createdAt: '2025-02-12T05:00:00.000Z',
+      updatedAt: '2025-03-01T06:00:00.000Z',
+    };
+    const imported = await request('/api/import', 'POST', { entries: [entry] }, alice);
+    expect(imported.statusCode).toBe(200);
+    expect(JSON.parse(imported.body)).toEqual({ imported: 1, skipped: 0 });
+    expect(
+      JSON.parse((await request('/api/export', 'GET', undefined, alice)).body).entries,
+    ).toEqual([entry]);
+    expect(JSON.parse((await request('/api/export', 'GET', undefined, bob)).body).entries).toEqual(
+      [],
+    );
+    expect(
+      JSON.parse(
+        (
+          await request(
+            '/api/import',
+            'POST',
+            { entries: [{ ...entry, title: 'Do not overwrite' }] },
+            alice,
+          )
+        ).body,
+      ),
+    ).toEqual({ imported: 0, skipped: 1 });
+    expect(
+      JSON.parse((await request('/api/export', 'GET', undefined, alice)).body).entries,
+    ).toEqual([entry]);
+    expect((await request('/api/import', 'POST', { entries: [entry] })).statusCode).toBe(401);
+    expect(
+      (await request('/api/import', 'POST', { entries: [entry] }, alice, 'https://other.example'))
+        .statusCode,
+    ).toBe(403);
+  });
+  it('validates the complete import batch before saving any entries', async () => {
+    const cookie = await signup('alice');
+    const entry = {
+      ...input,
+      id: 'a4a2fbdc-25ed-4a46-8f78-a0cb401c69ff',
+      createdAt: '2025-02-12T05:00:00.000Z',
+      updatedAt: '2025-03-01T06:00:00.000Z',
+    };
+    expect(
+      (
+        await request(
+          '/api/import',
+          'POST',
+          { entries: [entry, { ...entry, createdAt: 'bad-date' }] },
+          cookie,
+        )
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      JSON.parse((await request('/api/export', 'GET', undefined, cookie)).body).entries,
+    ).toEqual([]);
+  });
   it('rejects anonymous reads, writes, sources, and export', async () => {
     for (const path of ['/api/entries', '/api/entries/example', '/api/sources', '/api/export'])
       expect((await request(path)).statusCode).toBe(401);

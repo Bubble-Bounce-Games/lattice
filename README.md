@@ -87,7 +87,9 @@ Local SQLite data lives under `.wrangler/state/v3/d1/` and survives server resta
 
 Writes use validated prepared statements. Updates and deletes require the last observed `updatedAt`; a stale tab cannot silently replace or remove newer content. A failed save keeps the form open. Entries are never stored primarily in browser storage; only the preferred list/grid view is device-local. API responses containing knowledge are not cached.
 
-The local Vinext/Cloudflare version has no app-level multi-user authentication and should use loopback for development. The AWS build adds account creation, sign-in, secure HttpOnly session cookies, and user-scoped database access. AWS accounts are separate from Focus List accounts. New AWS libraries start empty; local entries are not uploaded automatically.
+The local Vinext/Cloudflare version has no app-level multi-user authentication and should use loopback for development. The AWS build uses one email-and-password sign-in form: first sign-in saves a new email's access automatically (minimum eight-character password); subsequent visits require the same password. Passwords are hashed and sessions use secure HttpOnly cookies. Each email has its own private library, separate from Focus List.
+
+To transfer a Lattice JSON export to a signed-in AWS library, run `node scripts/import-aws.mjs lattice-export.json --email person@example.com` to preview, then add `--apply` to import. The script prompts for the password without echo, preserves entry IDs and original dates, verifies the restored content, and skips identical existing records. It never changes the local source database. Imports use the authenticated `/api/import` endpoint and cannot select another user's library.
 
 ## Verification
 

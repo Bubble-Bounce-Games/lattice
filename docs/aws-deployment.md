@@ -99,7 +99,7 @@ Wait for DNS propagation, then open **https://lattice.abhijeet-anand.com**. Use 
 
 ## 7. Verify and enable future deployments
 
-1. Create a Lattice account with a username and a password of at least 12 characters. These are separate accounts from Focus List. Password recovery is not included yet.
+1. Sign in with an email and a password of at least eight characters. First sign-in saves that email's access automatically; subsequent visits require the same password. These are separate accounts from Focus List. Password recovery is not included yet.
 2. Create an entry, refresh, edit it, search for it, and use **Settings → Export library**.
 3. Sign out, create a second account, and confirm the second library is empty.
 4. Sign back in with the first account and confirm its entry remains.
@@ -107,7 +107,7 @@ Wait for DNS propagation, then open **https://lattice.abhijeet-anand.com**. Use 
 
 Future pushes to `main` will then deploy automatically. You can also run the workflow manually at any time.
 
-Local SQLite entries remain on your machine. The AWS version starts with an empty library for each account; the local `db:import` command does not import to AWS. Export local entries before any separate data migration.
+Local SQLite entries remain on your machine. To transfer a Lattice JSON export to AWS, use `node scripts/import-aws.mjs lattice-export.json --email person@example.com --apply`. The script prompts for the password without echo and verifies all imported entries, including their original dates. Re-running skips identical existing records. The local `db:import` command still targets local SQLite only.
 
 ## Troubleshooting
 
